@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'">
+    <link rel="stylesheet" href="styles.css">
+    <title>ARIA</title>
+</head>
+
+<body>
+
+    <!-- Titlebar -->
+    <div class="titlebar">
+        <div>
+            <span class="app-name">A R I A</span>
+        </div>
+        <span class="app-version">v1.0.0</span>
+        <div class="win-controls">
+            <button id="minimizeBtn">─</button>
+            <button id="closeBtn">✕</button>
+        </div>
+    </div>
+
+    <!-- Orb -->
+    <div class="orb-container">
+        <div class="orb-ring-outer" id="orbRingOuter">
+            <div class="orb-ring-mid" id="orbRingMid">
+                <div class="orb" id="orb">
+                    <div class="pulse-ring"></div>
+                    <div class="pulse-ring"></div>
+                    <div class="pulse-ring"></div>
+                    <span class="orb-icon" id="orbIcon">◉</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Wave bars -->
+        <div class="wave-bars" id="waveBars">
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+        </div>
+
+        <!-- Status -->
+        <div class="status-row">
+            <div class="status-dot" id="statusDot"></div>
+            <span class="status-text" id="statusText">STANDBY</span>
+        </div>
+    </div>
+
+    <!-- Transcript -->
+    <div class="transcript" id="transcript">
+        <div class="transcript-placeholder" id="placeholder">_ awaiting input</div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+        <button class="mic-btn" id="micBtn">🎙 &nbsp;SPEAK</button>
+        <button class="settings-btn" id="settingsBtn">⚙</button>
+    </div>
+
+    <!-- Settings -->
+    <div class="settings-panel" id="settingsPanel" style="display:none">
+        <label class="toggle-row">
+            <span>Auto-start with Windows</span>
+            <input type="checkbox" id="autostartToggle" checked
+                onchange="window.electronAPI.toggleAutostart(this.checked)">
+        </label>
+        <button class="settings-close-btn" id="settingsCloseBtn">CLOSE</button>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
