@@ -276,7 +276,7 @@ The installer includes:
 - [x] Sound effects engine
 - [x] Sci-fi animated UI
 - [x] Auto-start on Windows boot
-- [ ] Wake word detection ("Hey ARIA")
+- [x] Wake word detection ("Hey ARIA")
 - [ ] Ollama local AI integration
 - [ ] Gmail automation
 - [ ] Browser automation (Puppeteer)
