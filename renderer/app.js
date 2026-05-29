@@ -148,6 +148,33 @@ window.electronAPI.onStatusUpdate((status) => {
     else { setStatus('standby') }
 })
 
+// ── Wake word detected ────────────────────────────────────────────
+window.electronAPI.onWakeWord(() => {
+  console.log('[UI] Wake word detected!')
+
+  // Visual flash on orb
+  orb.style.transition = 'all 0.1s'
+  orbRingOuter.style.borderColor = 'var(--green)'
+
+  // Play wake sound — ascending three tones
+  playTone(440, 'sine', 0.08, 0.2)
+  setTimeout(() => playTone(550, 'sine', 0.08, 0.2), 80)
+  setTimeout(() => playTone(660, 'sine', 0.15, 0.25), 160)
+
+  // Update button to show it's active
+  micBtn.classList.add('active')
+  micBtn.textContent = '⏹  RECORDING...'
+  setStatus('listening')
+})
+
+// ── Pipeline done (after wake word trigger) ───────────────────────
+window.electronAPI.onPipelineDone(() => {
+  micBtn.classList.remove('active')
+  micBtn.innerHTML = '🎙 &nbsp;SPEAK'
+  isRecording = false
+  setStatus('standby')
+})
+
 // User transcription — show immediately
 window.electronAPI.onUserMessage((text) => {
     addUserMessage(text)

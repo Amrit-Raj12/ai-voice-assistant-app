@@ -718,6 +718,32 @@ body::after {
     animation: glow-pulse 1s ease-in-out infinite;
 }
 
+
+/* Wake word badge */
+.wake-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 1px;
+  opacity: 0.6;
+  transition: opacity 0.3s;
+}
+
+.wake-badge:hover { opacity: 1; }
+
+.wake-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+  animation: blink 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
 @keyframes glow-pulse {
 
     0%,
