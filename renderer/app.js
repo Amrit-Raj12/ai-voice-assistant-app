@@ -225,27 +225,58 @@ window.electronAPI.onGoodbye((msg) => {
     micBtn.textContent = 'GOODBYE...'
 })
 
+// ── Stop signal ───────────────────────────────────────────────────
+window.electronAPI.onStopSignal(() => {
+  // Kill any ongoing word streaming
+  if (currentAriaRow) finishAriaMessage(false)
+
+  // Add stopped message
+  const row = document.createElement('div')
+  row.className = 'msg-row msg-aria'
+  row.innerHTML = `
+    <div class="msg-label">◉ ARIA</div>
+    <div class="msg-text" style="color:var(--muted)">— stopped —</div>
+  `
+  transcript.appendChild(row)
+  transcript.scrollTop = transcript.scrollHeight
+
+  // Reset UI
+  setStatus('standby')
+  micBtn.classList.remove('active')
+  micBtn.innerHTML = '🎙 &nbsp;SPEAK'
+  isRecording = false
+
+  // Play stop sound
+  playTone(330, 'sine', 0.1, 0.2)
+  setTimeout(() => playTone(220, 'sine', 0.2, 0.15), 100)
+})
+
 // ── Mic button ────────────────────────────────────────────────────
 micBtn.addEventListener('click', async (e) => {
-    if (isRecording) return
-    isRecording = true
+  if (isRecording) return
+  isRecording = true
 
-    createRipple(e)
-    sounds.startRecording()
-    micBtn.classList.add('active')
-    micBtn.textContent = '⏹  RECORDING...'
+  createRipple(e)
+  sounds.startRecording()
 
-    const { intent, error } = await window.electronAPI.processVoice()
+  // Show feedback IMMEDIATELY — don't wait
+  micBtn.classList.add('active')
+  micBtn.textContent = '⏹  RECORDING...'
+  setStatus('listening')
 
-    if (error) {
-        sounds.error()
-        if (currentAriaRow) finishAriaMessage(true)
-        setStatus('standby')
-        isRecording = false
-        micBtn.classList.remove('active')
-        micBtn.innerHTML = '🎙 &nbsp;SPEAK'
-    }
-    // Note: isRecording reset happens in onUserMessage callback
+  // Small visual delay so user sees the state change
+  await new Promise(r => setTimeout(r, 50))
+
+  const { intent, error } = await window.electronAPI.processVoice()
+
+  if (error) {
+    sounds.error()
+    if (currentAriaRow) finishAriaMessage(true)
+    setStatus('standby')
+    isRecording = false
+    micBtn.classList.remove('active')
+    micBtn.innerHTML = '🎙 &nbsp;SPEAK'
+  }
 })
 
 // ── Settings ──────────────────────────────────────────────────────

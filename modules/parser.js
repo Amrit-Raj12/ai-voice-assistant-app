@@ -2,9 +2,19 @@ let pendingConfirmation = null
 
 
 const intents = [
+
+    // Stop / interrupt
+    { pattern: /^(stop|pause|quiet|silence|shut up|be quiet|stop talking|enough)\.?$/i, action: 'STOP' },
+
     // Greet
     { pattern: /^(hello|hi|hey|good\s*(morning|afternoon|evening|night))(\s+aria)?[!.]?$/i, action: 'GREET' },
     { pattern: /^aria[!.]?$/i, action: 'GREET' },
+    
+
+    // News & current info
+    { pattern: /(?:latest|recent|current|today'?s?)\s+news\s+(?:about\s+)?(.+)/i, action: 'NEWS', extract: m => m[1] },
+    { pattern: /(?:what'?s?|whats)\s+(?:happening|new|going on)\s+(?:with\s+)?(.+)/i, action: 'NEWS', extract: m => m[1] },
+    { pattern: /news\s+(?:about\s+)?(.+)/i, action: 'NEWS', extract: m => m[1] },
 
     // Yes / No — for confirmations
     { pattern: /^(yes|yeah|yep|yup|sure|correct|right|go ahead|do it)\.?$/i, action: 'YES' },

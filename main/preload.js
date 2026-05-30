@@ -12,4 +12,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onWakeWord:      (cb)      => ipcRenderer.on('wake-word-detected',  ()       => cb()),
   onPipelineDone:  (cb)      => ipcRenderer.on('pipeline-done',       ()       => cb()),
   onOllamaStatus:  (cb)      => ipcRenderer.on('ollama-status',      (_, val)  => cb(val)),
+  onStopSignal: (cb) => ipcRenderer.on('stop-signal', () => cb()),
 })

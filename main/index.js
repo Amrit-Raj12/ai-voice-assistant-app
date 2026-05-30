@@ -1,37 +1,71 @@
 const { app, BrowserWindow, ipcMain, session } = require('electron')
 const path = require('path')
-const { setupAutostart, disableAutostart }          = require('./autostart')
-const { recordAndTranscribe }                        = require('../modules/stt')
-const { parseCommand }                               = require('../modules/parser')
-const { handleAction }                               = require('../modules/actions')
-const { speak }                                      = require('../modules/tts')
-const { startWakeWordLoop, stopWakeWordLoop, setProcessingCommand } = require('../modules/wakeword')
-const { isOllamaRunning } = require('../modules/localai')
+const http  = require('http')
 const { exec } = require('child_process')
+
+const { setupAutostart, disableAutostart }                         = require('./autostart')
+const { recordAndTranscribe }                                      = require('../modules/stt')
+const { parseCommand }                                             = require('../modules/parser')
+const { handleAction }                                             = require('../modules/actions')
+const { speak, stopSpeaking  }                                                    = require('../modules/tts')
+const { isOllamaRunning }                                          = require('../modules/localai')
+const { startWakeWordLoop, stopWakeWordLoop, setProcessingCommand } = require('../modules/wakeword')
 
 let mainWindow
 let isQuitting = false
 
+// ── Auto-start Ollama ─────────────────────────────────────────────
+function startOllama() {
+  return new Promise((resolve) => {
+    console.log('[OLLAMA] Checking if running...')
 
-// Try to start Ollama silently if not already running
-async function ensureOllama() {
-  const running = await isOllamaRunning()
-  if (!running) {
-    console.log('[OLLAMA] Not running — attempting to start...')
-    exec('ollama serve', (err) => {
-      if (err) console.log('[OLLAMA] Could not auto-start:', err.message)
+    const check = http.get('http://localhost:11434/api/tags', (res) => {
+      if (res.statusCode === 200) {
+        console.log('[OLLAMA] Already running')
+        resolve(true)
+      }
     })
-    // Give it 3 seconds to start
-    await new Promise(r => setTimeout(r, 3000))
-    const nowRunning = await isOllamaRunning()
-    console.log('[OLLAMA] Started:', nowRunning)
-    return nowRunning
-  }
-  console.log('[OLLAMA] Already running')
-  return true
+
+    check.on('error', () => {
+      console.log('[OLLAMA] Not running — starting ollama serve...')
+
+      const proc = exec('ollama serve')
+      proc.unref()
+
+      proc.stderr?.on('data', d => {
+        const msg = d.toString()
+        if (msg.includes('address already in use')) {
+          console.log('[OLLAMA] Already running (port busy)')
+          resolve(true)
+        }
+      })
+
+      // Poll every second until Ollama responds
+      let attempts = 0
+      const poll = setInterval(() => {
+        attempts++
+        const req = http.get('http://localhost:11434/api/tags', (res) => {
+          if (res.statusCode === 200) {
+            clearInterval(poll)
+            console.log('[OLLAMA] Started after', attempts, 'attempts')
+            resolve(true)
+          }
+        })
+        req.on('error', () => {})
+
+        if (attempts >= 15) {
+          clearInterval(poll)
+          console.log('[OLLAMA] Failed to start after 15 attempts')
+          resolve(false)
+        }
+      }, 1000)
+    })
+
+    check.setTimeout(2000, () => check.destroy())
+  })
 }
 
-// ── Window ────────────────────────────────────────────────────────
+// ── Create window ─────────────────────────────────────────────────
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 420, height: 680,
@@ -47,55 +81,82 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
 
-  // Startup greeting
+  // ── Startup greeting + init ───────────────────────────────────
   mainWindow.webContents.once('did-finish-load', async () => {
     const hour = new Date().getHours()
     let greeting
+
     if      (hour >= 5  && hour < 12) greeting = `Good morning Amrit! I am ARIA, your personal voice assistant. I am ready to help you. Have a productive day!`
     else if (hour >= 12 && hour < 17) greeting = `Good afternoon Amrit! I am ARIA, your personal voice assistant. I am ready to assist you whenever you need.`
     else if (hour >= 17 && hour < 21) greeting = `Good evening Amrit! I am ARIA, your personal voice assistant. How can I make your evening easier?`
     else                              greeting = `Good night Amrit! I am ARIA, your personal voice assistant. Working late? I am here to help.`
 
-     // Check Ollama in background
-    ensureOllama().then(running => {
-        console.log('[MAIN] Ollama status:', running ? 'online' : 'offline')
-        mainWindow.webContents.send('ollama-status', running)
+    // Send Ollama status to UI
+    isOllamaRunning().then(running => {
+      console.log('[MAIN] Ollama status for UI:', running)
+      mainWindow.webContents.send('ollama-status', running)
+
+      // Recheck every 10 seconds until online
+      const statusInterval = setInterval(async () => {
+        if (!mainWindow || mainWindow.isDestroyed()) {
+          clearInterval(statusInterval)
+          return
+        }
+        const r = await isOllamaRunning()
+        mainWindow.webContents.send('ollama-status', r)
+        if (r) clearInterval(statusInterval)
+      }, 10000)
     })
 
+    // Startup greeting
     setTimeout(async () => {
-    mainWindow.webContents.send('aria-message', { start: true })
-    await Promise.all([
-      speak(greeting),
-      streamWords(greeting, mainWindow)
-    ])
-    mainWindow.webContents.send('status-update', 'idle')
+      mainWindow.webContents.send('aria-message', { start: true })
+      await Promise.all([
+        speak(greeting),
+        streamWords(greeting, mainWindow)
+      ])
+      mainWindow.webContents.send('status-update', 'idle')
 
-    // Start wake word AFTER greeting finishes
-    startWakeWordLoop(() => {
-      if (!mainWindow || mainWindow.isDestroyed()) return
-      if (mainWindow.isMinimized()) mainWindow.restore()
-      mainWindow.focus()
-      mainWindow.webContents.send('wake-word-detected')
-      triggerVoicePipeline()
-    })
+      // Start wake word AFTER greeting finishes
+      startWakeWordLoop(() => {
+        if (!mainWindow || mainWindow.isDestroyed()) return
+        if (mainWindow.isMinimized()) mainWindow.restore()
+        mainWindow.focus()
+        mainWindow.webContents.send('wake-word-detected')
+        triggerVoicePipeline()
+      })
+
     }, 1500)
   })
 }
 
 // ── App ready ─────────────────────────────────────────────────────
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   session.defaultSession.setPermissionRequestHandler((wc, permission, cb) => {
     cb(permission === 'media')
   })
+
+  // Start Ollama before window
+  console.log('[MAIN] Starting Ollama...')
+  const ollamaReady = await startOllama()
+  console.log('[MAIN] Ollama ready:', ollamaReady)
+
   createWindow()
   try { setupAutostart() } catch(e) {}
+
+  // Pre-warm Ollama — send a tiny request so first real query is fast
+  if (ollamaReady) {
+    console.log('[MAIN] Pre-warming Ollama...')
+    const { queryLocalAI } = require('../modules/localai')
+    queryLocalAI('hi').catch(() => {}) // fire and forget
+  }
 })
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
-// ── Goodbye ───────────────────────────────────────────────────────
+// ── Goodbye on close ──────────────────────────────────────────────
 app.on('before-quit', async (e) => {
   if (isQuitting) return
   e.preventDefault()
@@ -112,33 +173,64 @@ app.on('before-quit', async (e) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('goodbye-message', bye)
   }
+
   await speak(bye)
   app.exit(0)
 })
 
-// ── IPC ───────────────────────────────────────────────────────────
+// ── IPC handlers ──────────────────────────────────────────────────
 ipcMain.on('minimize-window',  () => mainWindow.minimize())
 ipcMain.on('close-window',     () => app.quit())
-ipcMain.on('toggle-autostart', (_, enabled) => enabled ? setupAutostart() : disableAutostart())
+ipcMain.on('toggle-autostart', (_, enabled) => {
+  enabled ? setupAutostart() : disableAutostart()
+})
 
-// Single process-voice handler — used by mic button
+// Single process-voice handler
 ipcMain.handle('process-voice', async () => {
   await triggerVoicePipeline()
   return { error: null }
 })
 
-// ── Voice pipeline (shared by button + wake word) ─────────────────
+// ── Voice pipeline ────────────────────────────────────────────────
 async function triggerVoicePipeline() {
   if (!mainWindow || mainWindow.isDestroyed()) return
   setProcessingCommand(true)
 
   try {
     mainWindow.webContents.send('status-update', 'listening')
-    const text = await recordAndTranscribe(5000)
+    const text = await recordAndTranscribe(4000)
+
+    // Skip processing if nothing was heard
+    if (!text || text === '__EMPTY__' || text.trim().length < 2) {
+      mainWindow.webContents.send('user-message', '(nothing heard)')
+      mainWindow.webContents.send('aria-message', { start: true })
+      const msg = 'I did not hear anything Amrit. Please try again.'
+      await Promise.all([
+        speak(msg),
+        streamWords(msg, mainWindow)
+      ])
+      mainWindow.webContents.send('status-update', 'idle')
+      mainWindow.webContents.send('pipeline-done')
+      return
+    }
 
     mainWindow.webContents.send('status-update', 'processing')
     const intent = parseCommand(text)
     const result = await handleAction(intent)
+
+    // ── Handle STOP signal ──────────────────────────────────────
+    if (result === '__STOP__') {
+      console.log('[MAIN] Stop command received')
+      stopSpeaking()
+      mainWindow.webContents.send('user-message', text)
+      mainWindow.webContents.send('stop-signal')
+      mainWindow.webContents.send('status-update', 'idle')
+      mainWindow.webContents.send('pipeline-done')
+
+      // Kill any running TTS
+      exec('taskkill /F /IM powershell.exe /FI "WINDOWTITLE eq speak*"', () => {})
+      return
+    }
 
     mainWindow.webContents.send('status-update', 'speaking')
     mainWindow.webContents.send('user-message', text)
@@ -181,7 +273,7 @@ async function triggerVoicePipeline() {
 // ── Helpers ───────────────────────────────────────────────────────
 function streamWords(text, win) {
   return new Promise((resolve) => {
-    const words = text.split(' ').filter(w => w.length > 0)
+    const words      = text.split(' ').filter(w => w.length > 0)
     const MS_PER_WORD = 60000 / 130
 
     win.webContents.send('aria-message', { text: '', done: false, start: true })

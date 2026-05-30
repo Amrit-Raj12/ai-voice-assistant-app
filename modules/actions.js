@@ -232,6 +232,17 @@ async function handleAction({ action, param }) {
         }
         }
 
+        case 'NEWS': {
+        console.log('[ACTION] News search for:', param)
+        try {
+            const { queryLocalAI } = require('./localai')
+            const response = await queryLocalAI(`latest news about ${param}`)
+            return response
+        } catch(e) {
+            return `I could not fetch news about ${param} right now.`
+        }
+        }
+
         // ── Confirmation ask ───────────────────────────────────────────
         case 'ASK_CONFIRM': {
             return `Did you say ${param}? Please say yes to confirm or no to cancel.`
@@ -241,6 +252,10 @@ async function handleAction({ action, param }) {
             return `Okay Amrit, no problem. What else can I help you with?`
         }
 
+        case 'STOP': {
+            return '__STOP__' 
+        }
+        
         default:
             return `I don't know how to handle that command yet.`
     }
