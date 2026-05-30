@@ -255,6 +255,16 @@ settingsBtn.addEventListener('click', () => {
 settingsClose.addEventListener('click', () => {
     settingsPanel.style.display = 'none'
 })
+
+// ── Ollama status indicator ───────────────────────────────────────
+const aiBadge = document.getElementById('aiBadge')
+window.electronAPI.onOllamaStatus((running) => {
+  if (aiBadge) {
+    aiBadge.textContent  = running ? '● online' : '○ offline'
+    aiBadge.className    = 'ai-badge ' + (running ? 'online' : 'offline')
+  }
+})
+
 document.addEventListener('click', (e) => {
     if (!settingsPanel.contains(e.target) && e.target !== settingsBtn) {
         settingsPanel.style.display = 'none'

@@ -6,9 +6,30 @@ const { parseCommand }                               = require('../modules/parse
 const { handleAction }                               = require('../modules/actions')
 const { speak }                                      = require('../modules/tts')
 const { startWakeWordLoop, stopWakeWordLoop, setProcessingCommand } = require('../modules/wakeword')
+const { isOllamaRunning } = require('../modules/localai')
+const { exec } = require('child_process')
 
 let mainWindow
 let isQuitting = false
+
+
+// Try to start Ollama silently if not already running
+async function ensureOllama() {
+  const running = await isOllamaRunning()
+  if (!running) {
+    console.log('[OLLAMA] Not running — attempting to start...')
+    exec('ollama serve', (err) => {
+      if (err) console.log('[OLLAMA] Could not auto-start:', err.message)
+    })
+    // Give it 3 seconds to start
+    await new Promise(r => setTimeout(r, 3000))
+    const nowRunning = await isOllamaRunning()
+    console.log('[OLLAMA] Started:', nowRunning)
+    return nowRunning
+  }
+  console.log('[OLLAMA] Already running')
+  return true
+}
 
 // ── Window ────────────────────────────────────────────────────────
 function createWindow() {
@@ -35,23 +56,28 @@ function createWindow() {
     else if (hour >= 17 && hour < 21) greeting = `Good evening Amrit! I am ARIA, your personal voice assistant. How can I make your evening easier?`
     else                              greeting = `Good night Amrit! I am ARIA, your personal voice assistant. Working late? I am here to help.`
 
+     // Check Ollama in background
+    ensureOllama().then(running => {
+        console.log('[MAIN] Ollama status:', running ? 'online' : 'offline')
+        mainWindow.webContents.send('ollama-status', running)
+    })
+
     setTimeout(async () => {
-      mainWindow.webContents.send('aria-message', { start: true })
-      await Promise.all([
-        speak(greeting),
-        streamWords(greeting, mainWindow)
-      ])
-      mainWindow.webContents.send('status-update', 'idle')
+    mainWindow.webContents.send('aria-message', { start: true })
+    await Promise.all([
+      speak(greeting),
+      streamWords(greeting, mainWindow)
+    ])
+    mainWindow.webContents.send('status-update', 'idle')
 
-      // Start wake word AFTER greeting finishes
-      startWakeWordLoop(() => {
-        if (!mainWindow || mainWindow.isDestroyed()) return
-        if (mainWindow.isMinimized()) mainWindow.restore()
-        mainWindow.focus()
-        mainWindow.webContents.send('wake-word-detected')
-        triggerVoicePipeline()
-      })
-
+    // Start wake word AFTER greeting finishes
+    startWakeWordLoop(() => {
+      if (!mainWindow || mainWindow.isDestroyed()) return
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+      mainWindow.webContents.send('wake-word-detected')
+      triggerVoicePipeline()
+    })
     }, 1500)
   })
 }

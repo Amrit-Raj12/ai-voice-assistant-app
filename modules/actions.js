@@ -222,12 +222,14 @@ async function handleAction({ action, param }) {
             return `I didn't catch that, Amrit. Could you please repeat?`
 
         case 'AI_FALLBACK': {
-            try {
-                const { queryLocalAI } = require('./localai')
-                return await queryLocalAI(param)
-            } catch {
-                return `I heard you say "${param}", but I am not sure how to help with that yet. Try saying list commands to see what I can do.`
-            }
+        console.log('[ACTION] Sending to Ollama:', param)
+        try {
+            const { queryLocalAI } = require('./localai')
+            const response = await queryLocalAI(param)
+            return response
+        } catch(e) {
+            return `I heard you say "${param}", but I could not process that right now.`
+        }
         }
 
         // ── Confirmation ask ───────────────────────────────────────────

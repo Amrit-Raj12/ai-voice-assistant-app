@@ -744,6 +744,30 @@ body::after {
   flex-shrink: 0;
 }
 
+.ai-status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text);
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ai-badge {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.ai-badge.online  { color: var(--green); border-color: var(--green); }
+.ai-badge.offline { color: var(--red);   border-color: var(--red);   }
+
 @keyframes glow-pulse {
 
     0%,

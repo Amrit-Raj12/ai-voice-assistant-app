@@ -80,6 +80,10 @@
             <input type="checkbox" id="autostartToggle" checked
                 onchange="window.electronAPI.toggleAutostart(this.checked)">
         </label>
+        <div class="ai-status-row">
+            <span>Local AI (Ollama)</span>
+            <span class="ai-badge" id="aiBadge">⏳ checking</span>
+        </div>
         <button class="settings-close-btn" id="settingsCloseBtn">CLOSE</button>
     </div>
 
